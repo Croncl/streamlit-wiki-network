@@ -1,0 +1,16 @@
+# Evitar arquivos desnecessários no Git
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.log
+*.db
+*.sqlite3
+.DS_Store
+
+# Streamlit cache
+.streamlit/
+
+# Arquivos temporários
+*.swp
