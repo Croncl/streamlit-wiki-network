@@ -58,45 +58,7 @@ done_set = set() # Nothing is done yet
 g = nx.DiGraph()
 layer, page = todo_lst[0]
 
-# Commented out IPython magic to ensure Python compatibility.
-# %%time
-# while layer < 2 and len(g.nodes) < 5000:
-#     # Remove the name page of the current page from the todo_lst,
-#     # and add it to the set of processed pages.
-#     # If the script encounters this page again, it will skip over it.
-#     del todo_lst[0]
-#     done_set.add(page)
-# 
-#     # Show progress
-#     print(layer, page)
-# 
-#     # Attempt to download the selected page.
-#     try:
-#         wiki = wikipedia.page(page)
-#     except:
-#         print("Could not load", page)
-#         if todo_lst:
-#             layer, page = todo_lst[0]
-#         continue
-# 
-#     for link in wiki.links:
-#         link = link.title()
-#         if link not in STOPS and not link.startswith("List Of"):
-#             if link not in todo_set and link not in done_set:
-#                 # Verifica se atingiu o limite de nós
-#                 if len(g.nodes) >= 2000:
-#                     break
-#                 todo_lst.append((layer + 1, link))
-#                 todo_set.add(link)
-#             g.add_edge(page, link)
-# 
-#     if todo_lst:
-#         layer, page = todo_lst[0]
-#     else:
-#         break
-# 
-# print("{} nodes, {} edges".format(len(g), nx.number_of_edges(g)))
-#
+
 
 print("{} nodes, {} edges".format(len(g), nx.number_of_edges(g)))
 

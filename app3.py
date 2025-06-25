@@ -303,7 +303,7 @@ if uploaded_file:
     # =============================================
     # DISTRIBUIÇÃO DE GRAU
     # =============================================
-    with st.expander("📈 Distribuição de Grau(C/filtro)", expanded=False):
+    with st.expander("📈 Distribuição de Grau (C/filtro)", expanded=False):
         fig, ax = plt.subplots(1, 2, figsize=(12, 4))
 
         # Grau de entrada
@@ -316,7 +316,7 @@ if uploaded_file:
         ax[0].set_title("Distribuição do Grau de Entrada")
         ax[0].set_xlabel("Grau de entrada")
         ax[0].set_ylabel("Frequência")
-        ax[0].set_yscale("log")  # <- Aplica escala log no eixo Y
+        # Escala linear padrão (sem set_yscale)
 
         # Grau de saída
         sns.histplot(
@@ -328,14 +328,15 @@ if uploaded_file:
         ax[1].set_title("Distribuição do Grau de Saída")
         ax[1].set_xlabel("Grau de saída")
         ax[1].set_ylabel("Frequência")
-        ax[1].set_yscale("log")  # <- Também aplica no segundo gráfico
+        # Escala linear padrão
 
         st.pyplot(fig)
         st.markdown(
             """
-        A distribuição de grau mostra como os nós estão conectados na rede. A escala logarítmica no eixo Y ajuda a visualizar melhor as frequências, especialmente em redes com muitos nós de grau baixo e poucos de grau alto.
-        Uma distribuição com cauda longa indica que poucos nós têm muitos links, enquanto a maioria tem poucos.
-        """
+            A distribuição de grau mostra como os nós estão conectados na rede. 
+            Uma distribuição com cauda longa indica que poucos nós têm muitos links, 
+            enquanto a maioria tem poucos.
+            """
         )
 
     # =============================================
