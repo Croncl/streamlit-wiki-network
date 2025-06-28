@@ -78,6 +78,29 @@ if uploaded_file:
         "Ex: A pode não alcançar B na direção correta, mas ainda faz parte do mesmo grupo fraco."
     )
 
+    def calcular_assortatividade_segura(grafo):
+        """
+        Calcula o coeficiente de assortatividade de forma segura, evitando erros em grafos esparsos.
+        
+        Args:
+            grafo: Um grafo NetworkX (Graph ou DiGraph)
+        
+        Returns:
+            float: Valor da assortatividade ou None se não for possível calcular
+        """
+        try:
+            # Verifica se o grafo tem nós suficientes e variação de graus
+            if grafo.number_of_nodes() < 2:
+                return None
+                
+            degrees = [d for _, d in grafo.degree()]
+            if len(set(degrees)) < 2:  # Todos os nós têm o mesmo grau
+                return None
+                
+            return nx.degree_assortativity_coefficient(grafo)
+        except (ZeroDivisionError, nx.NetworkXError):
+            return None
+    
     # =============================================
     # MÉTRICAS ESTRUTURAIS
     # =============================================
@@ -86,16 +109,13 @@ if uploaded_file:
 
         with col1:
             st.metric("Densidade", f"{nx.density(G):.4f}", help=help_densidade)
+            assort = calcular_assortatividade_segura(G)
             st.metric(
                 "Assortatividade(grau do nó)",
-                f"{nx.degree_assortativity_coefficient(G):.4f}",
+                f"{assort:.4f}" if assort is not None else "N/A",
                 help=help_assortatividade,
             )
-            st.metric(
-                "Coef. Clustering",
-                f"{nx.average_clustering(G.to_undirected()):.4f}",
-                help=help_clustering,
-            )
+        
 
         with col2:
             scc = (
@@ -153,7 +173,20 @@ if uploaded_file:
     col1, col2, col3 = st.columns(3)
 
     with col1:
-        min_degree = st.slider("Grau mínimo do nó", 1, 10, 6)
+        in_degree_range = st.slider(
+            "Intervalo de Grau de Entrada (in-degree)",
+            min_value=0,
+            max_value=50,
+            value=(10, 50)
+        )
+
+        out_degree_range = st.slider(
+            "Intervalo de Grau de Saída (out-degree)",
+            min_value=0,
+            max_value=20,
+            value=(4, 6)
+        )
+
     with col2:
         show_largest_scc = st.checkbox("Mostrar maior SCC (dirigido)", value=False)
     with col3:
@@ -166,19 +199,30 @@ if uploaded_file:
         largest_scc = max(nx.strongly_connected_components(G), key=len)
         SG = G.subgraph(largest_scc).copy()
         st.info(
-            f"Subgrafo: Maior SCC → {SG.number_of_nodes()} nós, {SG.number_of_edges()} arestas"
+            f"Subgrafo: Maior SCC → {G.number_of_nodes()} nós, {G.number_of_edges()} arestas"
         )
     elif show_largest_wcc:
         largest_wcc = max(nx.weakly_connected_components(G), key=len)
         SG = G.subgraph(largest_wcc).copy()
         st.info(
-            f"Subgrafo: Maior WCC → {SG.number_of_nodes()} nós, {SG.number_of_edges()} arestas"
+            f"Subgrafo: Maior WCC → {G.number_of_nodes()} nós, {G.number_of_edges()} arestas"
         )
     else:
-        SG_nodes = [n for n in G.nodes() if G.degree(n) >= min_degree]
+        # Filtragem de nós com base nos intervalos selecionados
+        SG_nodes = [
+            n for n in G.nodes()
+            if in_degree_range[0] <= G.in_degree(n) <= in_degree_range[1]
+            or out_degree_range[0] <= G.out_degree(n) <= out_degree_range[1]
+        ]
+
+        # Subgrafo induzido pelos nós filtrados
         SG = G.subgraph(SG_nodes).copy()
+
+        # Exibir estatísticas do subgrafo
         st.info(
-            f"Subgrafo (grau ≥ {min_degree}): {SG.number_of_nodes()} nós, {SG.number_of_edges()} arestas"
+            f"Subgrafo (grau de entrada ∈ [{in_degree_range[0]}, {in_degree_range[1]}], "
+            f"grau de saída ∈ [{out_degree_range[0]}, {out_degree_range[1]}]): "
+            f"{G.number_of_nodes()} nós, {G.number_of_edges()} arestas"
         )
 
     # =============================================
@@ -208,8 +252,8 @@ if uploaded_file:
         net.options.configure = {"enabled": False}
 
         # Calcular graus de entrada e saída
-        in_degrees = dict(SG.in_degree())
-        out_degrees = dict(SG.out_degree())
+        in_degrees = dict(G.in_degree())
+        out_degrees = dict(G.out_degree())
 
         # Evita divisão por zero
         max_in = max(in_degrees.values()) if in_degrees else 1
@@ -240,7 +284,8 @@ if uploaded_file:
                 degree_info = f"Grau entrada/saída: {k_in}"
 
             saturation = 70
-            lightness = 60 - min(20, total / max(max_in, max_out) * 20)
+            denominator = max(max_in, max_out)
+            lightness = 60 - min(20, total / denominator * 20) if denominator > 0 else 60
             degree_info = f"Grau entrada: {k_in}, saída: {k_out}"
 
             net.add_node(
@@ -276,9 +321,11 @@ if uploaded_file:
 
         with col1:
             st.metric("Densidade", f"{nx.density(SG):.4f}", help=help_densidade)
+            
+            assort = calcular_assortatividade_segura(SG)
             st.metric(
                 "Assortatividade(grau do nó)",
-                f"{nx.degree_assortativity_coefficient(SG):.4f}",
+                f"{assort:.4f}" if assort is not None else "N/A",
                 help=help_assortatividade,
             )
             st.metric(
@@ -303,7 +350,7 @@ if uploaded_file:
     # =============================================
     # DISTRIBUIÇÃO DE GRAU
     # =============================================
-    with st.expander("📈 Distribuição de Grau(C/filtro)", expanded=False):
+    with st.expander("📈 Distribuição de Grau (C/filtro)", expanded=False):
         fig, ax = plt.subplots(1, 2, figsize=(12, 4))
 
         # Grau de entrada
@@ -316,7 +363,7 @@ if uploaded_file:
         ax[0].set_title("Distribuição do Grau de Entrada")
         ax[0].set_xlabel("Grau de entrada")
         ax[0].set_ylabel("Frequência")
-        ax[0].set_yscale("log")  # <- Aplica escala log no eixo Y
+        # Escala linear padrão (sem set_yscale)
 
         # Grau de saída
         sns.histplot(
@@ -328,14 +375,15 @@ if uploaded_file:
         ax[1].set_title("Distribuição do Grau de Saída")
         ax[1].set_xlabel("Grau de saída")
         ax[1].set_ylabel("Frequência")
-        ax[1].set_yscale("log")  # <- Também aplica no segundo gráfico
+        # Escala linear padrão
 
         st.pyplot(fig)
         st.markdown(
             """
-        A distribuição de grau mostra como os nós estão conectados na rede. A escala logarítmica no eixo Y ajuda a visualizar melhor as frequências, especialmente em redes com muitos nós de grau baixo e poucos de grau alto.
-        Uma distribuição com cauda longa indica que poucos nós têm muitos links, enquanto a maioria tem poucos.
-        """
+            A distribuição de grau mostra como os nós estão conectados na rede. 
+            Uma distribuição com cauda longa indica que poucos nós têm muitos links, 
+            enquanto a maioria tem poucos.
+            """
         )
 
     # =============================================
@@ -361,7 +409,7 @@ if uploaded_file:
                 ["Degree", "Closeness", "Betweenness", "Eigenvector"],
             )
         with col2:
-            k = st.slider("Número de nós para mostrar", 5, 50, 10)
+            k = st.slider("Número de nós para mostrar", 1, 50, 10)
 
         # Cálculo da centralidade
         if metric == "Degree":
@@ -410,9 +458,9 @@ if uploaded_file:
             net2.toggle_physics(True)
             net2.options.configure = {"enabled": False}
 
-            # Calcular graus de entrada e saída
-            in_degrees = dict(H.in_degree())
-            out_degrees = dict(H.out_degree())
+            # Calcular graus de entrada e saída #alterei H por G nos dois
+            in_degrees = dict(G.in_degree())
+            out_degrees = dict(G.out_degree())
 
             # Evita divisão por zero se grafo estiver vazio
             max_in = max(in_degrees.values()) if in_degrees else 1
@@ -424,10 +472,8 @@ if uploaded_file:
                 k_out = out_degrees.get(node, 0)
 
                 diff = abs(k_in - k_out)
-                total = k_in + k_out if (k_in + k_out) > 0 else 1
-                balance_ratio = (
-                    diff / total
-                )  # 0 = totalmente balanceado, 1 = totalmente desbalanceado
+                total = k_in + k_out
+                balance_ratio = diff / (total + 1e-10)  # Evita divisão por zero
                 # Determina o tipo de nó e sua coloração
 
                 if k_in > k_out:
@@ -446,7 +492,14 @@ if uploaded_file:
                     degree_info = f"Grau entrada/saída: {k_in}"
 
                 saturation = 70
-                lightness = 60 - min(20, total / max(max_in, max_out) * 20)
+                
+                max_connections = max(max_in, max_out)
+                if max_connections == 0:
+                    lightness = 60  # Valor padrão quando não há conexões
+                else:
+                    lightness = 60 - min(20, total / max_connections * 20)
+                
+                
                 degree_info = f"Grau entrada: {k_in}, saída: {k_out}"
 
                 net2.add_node(

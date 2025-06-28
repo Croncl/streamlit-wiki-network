@@ -19,7 +19,7 @@ Este projeto é uma aplicação web interativa desenvolvida com **Streamlit** pa
   - Visualização das arestas com pesos (se presentes)
   - Layout ForceAtlas2 com física ativada
 - Filtros para subgrafo com base em:
-  - Grau mínimo dos nós
+  - Grau mínimo e máximo de entrada ou de saída dos nós
   - Maior componente fortemente conectado (SCC)
   - Maior componente fracamente conectado (WCC)
 - Visualização das distribuições de grau (entrada e saída) com histogramas usando Matplotlib e Seaborn
