@@ -37,6 +37,7 @@ Este projeto é uma aplicação web interativa desenvolvida com **Streamlit** pa
 - [Pandas](https://pandas.pydata.org/)
 - [Matplotlib](https://matplotlib.org/)
 - [Seaborn](https://seaborn.pydata.org/)
+- [Numpy]
 
 ---
 

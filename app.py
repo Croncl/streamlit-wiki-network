@@ -1,18 +1,20 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 import networkx as nx
 from pyvis.network import Network
 import matplotlib.pyplot as plt
+from matplotlib.gridspec import GridSpec
 import seaborn as sns
 import tempfile
 import os
 
 # Configuração da página
-st.set_page_config(layout="wide", page_title="Análise de Redes Complexas")
-st.title("🔍 Análise e Visualização de Redes Complexas")
+st.set_page_config(layout="wide", page_title="Análise de Redes")
+st.title("🔍 Análise e Visualização de Redes")
 st.markdown(
     """
-Esta aplicação analisa redes complexas a partir de dados de relacionamento.
+Esta aplicação analisa redes a partir de dados de relacionamento.
 Carregue um arquivo CSV com colunas 'source' e 'target' para começar.
 """
 )
@@ -44,7 +46,6 @@ if uploaded_file:
         "- 1: grafo completamente conectado (todos os nós se conectam entre si)\n\n"
         "Útil para entender quão interligada é a rede."
     )
-
     help_assortatividade = (
         "Mede a tendência de nós se conectarem com outros de grau similar. "
         "Varia de -1 a +1.\n\n"
@@ -53,7 +54,6 @@ if uploaded_file:
         "- Valor ≈ 0: conexões são aleatórias em relação ao grau dos nós\n\n"
         "Ajuda a entender o padrão de conexões da rede."
     )
-
     help_clustering = (
         "Mede o grau de agrupamento (formação de triângulos) entre os vizinhos de um nó. "
         "Varia de 0 a 1.\n\n"
@@ -61,7 +61,6 @@ if uploaded_file:
         "- Valor próximo de 0: pouca ou nenhuma formação de grupos\n\n"
         "Comum em redes sociais e redes pequenas-mundo."
     )
-
     help_scc = (
         "Número de subgrafos nos quais **cada nó pode alcançar todos os outros seguindo a direção das arestas**.\n\n"
         "- Relevante em redes dirigidas (como grafos de citações ou hyperlinks).\n"
@@ -81,10 +80,10 @@ if uploaded_file:
     def calcular_assortatividade_segura(grafo):
         """
         Calcula o coeficiente de assortatividade de forma segura, evitando erros em grafos esparsos.
-        
+
         Args:
             grafo: Um grafo NetworkX (Graph ou DiGraph)
-        
+
         Returns:
             float: Valor da assortatividade ou None se não for possível calcular
         """
@@ -92,17 +91,17 @@ if uploaded_file:
             # Verifica se o grafo tem nós suficientes e variação de graus
             if grafo.number_of_nodes() < 2:
                 return None
-                
+
             degrees = [d for _, d in grafo.degree()]
             if len(set(degrees)) < 2:  # Todos os nós têm o mesmo grau
                 return None
-                
+
             return nx.degree_assortativity_coefficient(grafo)
         except (ZeroDivisionError, nx.NetworkXError):
             return None
-    
+
     # =============================================
-    # MÉTRICAS ESTRUTURAIS
+    # MÉTRICAS ESTRUTURAIS E VISUALIZAÇÃO ESTÁTICA
     # =============================================
     with st.expander("📊 Métricas Estruturais da Rede", expanded=False):
         col1, col2 = st.columns(2)
@@ -115,7 +114,11 @@ if uploaded_file:
                 f"{assort:.4f}" if assort is not None else "N/A",
                 help=help_assortatividade,
             )
-        
+            st.metric(
+                "Coef. Clustering",
+                f"{nx.average_clustering(G.to_undirected()):.4f}",
+                help=help_clustering,
+            )
 
         with col2:
             scc = (
@@ -128,6 +131,148 @@ if uploaded_file:
                 "Componentes Fracamente Conectados",
                 nx.number_weakly_connected_components(G),
                 help=help_wcc,
+            )
+
+    # =============================================
+    # VISUALIZAÇÃO ESTÁTICA
+    # =============================================
+
+    with st.expander(
+        "📊 Visualização Estática do Grafo (Métricas de Centralidade)", expanded=False
+    ):
+        st.markdown(
+            """
+        ## Comparação Visual das Métricas de Centralidade
+        
+        Cada visualização destaca os nós mais importantes de acordo com diferentes métricas:
+        - **Tamanho do nó**: Proporcional à centralidade
+        - **Cor**: Escala de vermelho (mais importante) a azul (menos importante)
+        """
+        )
+
+        # Selecionar métrica
+        metric_option = st.selectbox(
+            "Selecione a métrica para visualização:",
+            [
+                "Degree Centrality",
+                "Closeness Centrality",
+                "Betweenness Centrality",
+                "Eigenvector Centrality",
+            ],
+            key="static_viz_metric",
+        )
+
+        # Calcular centralidades com tratamento de erro robusto
+        try:
+            if metric_option == "Degree Centrality":
+                centrality = nx.degree_centrality(G)
+                title = "Degree Centrality (Nós mais conectados)"
+            elif metric_option == "Closeness Centrality":
+                centrality = nx.closeness_centrality(G)
+                title = (
+                    "Closeness Centrality (Nós que alcançam outros mais rapidamente)"
+                )
+            elif metric_option == "Betweenness Centrality":
+                centrality = nx.betweenness_centrality(G)
+                title = "Betweenness Centrality (Nós que atuam como pontes)"
+            elif metric_option == "Eigenvector Centrality":
+                try:
+                    centrality = nx.eigenvector_centrality(G, max_iter=1000)
+                    title = (
+                        "Eigenvector Centrality (Nós conectados a outros importantes)"
+                    )
+                except nx.PowerIterationFailedConvergence:
+                    st.error(
+                        "Não foi possível calcular Eigenvector Centrality (o algoritmo não convergiu)"
+                    )
+                    centrality = None
+        except Exception as e:
+            st.error(f"Erro ao calcular {metric_option}: {str(e)}")
+            centrality = None
+
+        if centrality and len(centrality) > 0:
+            # Converter para numpy array e garantir que há variação
+            cent_values = np.array(list(centrality.values()))
+
+            # Verificar se há variação nos valores
+            if np.ptp(cent_values) == 0:
+                st.warning(
+                    f"Todos os nós têm o mesmo valor de {metric_option.split()[0]} Centrality"
+                )
+                sizes = np.full_like(cent_values, 300)  # Tamanho fixo
+                colors = np.zeros_like(cent_values)  # Cor uniforme
+            else:
+                # Normalização segura
+                sizes = 50 + 500 * (cent_values - cent_values.min()) / (
+                    np.ptp(cent_values) + 1e-10
+                )
+                colors = cent_values
+
+            # Configurações do plot
+            plt.figure(figsize=(16, 12), facecolor="#0D1117")
+            plt.gca().set_facecolor("#0D1117")  # fundo do eixo
+            # Versão com mais controle
+            pos = nx.random_layout(G, center=None, seed=42)
+
+            # Desenhar o grafo
+            nodes = nx.draw_networkx_nodes(
+                G,
+                pos,
+                node_size=sizes,
+                node_color=colors,
+                cmap=plt.cm.seismic,
+                alpha=0.9,
+            )
+
+            # Desenhar arestas
+            edges = nx.draw_networkx_edges(
+                G, pos, edge_color="lightgray", width=0.5, alpha=0.5
+            )
+
+            # Adicionar labels para os top 5 nós (se houver variação)
+            if np.ptp(cent_values) > 0:
+                top_nodes = sorted(
+                    centrality.items(), key=lambda x: x[1], reverse=True
+                )[:5]
+                for node, cent in top_nodes:
+                    plt.text(
+                        pos[node][0],
+                        pos[node][1],
+                        node,
+                        fontsize=8,
+                        ha="center",
+                        va="center",
+                        bbox=dict(facecolor="white", alpha=0.8, edgecolor="none"),
+                    )
+
+            # Configurações do gráfico
+            plt.title(title, fontsize=14, color="white")
+            if np.ptp(cent_values) > 0:  # Só mostra colorbar se houver variação
+                plt.colorbar(nodes, label="Valor de Centralidade")
+            plt.axis("off")
+
+            # Mostrar o plot no Streamlit
+            st.pyplot(plt)
+
+            # Adicionar explicação
+            st.markdown(
+                f"""
+            ### Interpretação:
+            - **Nós maiores e mais vermelhos**: Possuem maior {metric_option.split()[0]} centrality
+            - **Nós menores e mais azuis**: Possuem menor {metric_option.split()[0]} centrality
+            - **Top 5 nós** estão rotulados com seus nomes
+            """
+            )
+
+            # Mostrar tabela com centralidades
+            st.markdown("### 📊 Tabela de Centralidades")
+            df_centrality = pd.DataFrame.from_dict(
+                centrality, orient="index", columns=["Centralidade"]
+            )
+            st.dataframe(df_centrality.sort_values("Centralidade", ascending=False))
+        else:
+            st.warning(
+                "Não foi possível gerar a visualização para esta métrica ou todos os nós têm o mesmo valor."
             )
 
     # =============================================
@@ -169,66 +314,77 @@ if uploaded_file:
     # =============================================
     # CONTROLES DE FILTRO (NO CORPO PRINCIPAL)
     # =============================================
-    st.subheader("🔍 Filtros do Grafo")
-    col1, col2, col3 = st.columns(3)
+    with st.expander("🌐 Visualização Interativa do Grafo", expanded=False):
+        st.subheader("🔍 Filtros do Grafo")
+        col1, col2, col3 = st.columns(3)
 
-    with col1:
-        in_degree_range = st.slider(
-            "Intervalo de Grau de Entrada (in-degree)",
-            min_value=0,
-            max_value=50,
-            value=(10, 50)
-        )
+        with col1:
+            # Calcula os valores mínimo e máximo de grau de entrada
+            in_degrees = [d for n, d in G.in_degree()]
+            min_in_degree = min(in_degrees) if in_degrees else 0
+            max_in_degree = max(in_degrees) if in_degrees else 1
 
-        out_degree_range = st.slider(
-            "Intervalo de Grau de Saída (out-degree)",
-            min_value=0,
-            max_value=20,
-            value=(4, 6)
-        )
+            in_degree_range = st.slider(
+                "Intervalo de Grau de Entrada (in-degree)",
+                min_value=min_in_degree,
+                max_value=max_in_degree,
+                value=(2, max_in_degree // 4),
+            )
 
-    with col2:
-        show_largest_scc = st.checkbox("Mostrar maior SCC (dirigido)", value=False)
-    with col3:
-        show_largest_wcc = st.checkbox("Mostrar maior WCC", value=False)
+            # Calcula os valores mínimo e máximo de grau de saída
+            out_degrees = [d for n, d in G.out_degree()]
+            min_out_degree = min(out_degrees) if out_degrees else 0
+            max_out_degree = max(out_degrees) if out_degrees else 1
 
-    # =============================================
-    # APLICAÇÃO DOS FILTROS
-    # =============================================
-    if show_largest_scc and nx.is_directed(G):
-        largest_scc = max(nx.strongly_connected_components(G), key=len)
-        SG = G.subgraph(largest_scc).copy()
-        st.info(
-            f"Subgrafo: Maior SCC → {G.number_of_nodes()} nós, {G.number_of_edges()} arestas"
-        )
-    elif show_largest_wcc:
-        largest_wcc = max(nx.weakly_connected_components(G), key=len)
-        SG = G.subgraph(largest_wcc).copy()
-        st.info(
-            f"Subgrafo: Maior WCC → {G.number_of_nodes()} nós, {G.number_of_edges()} arestas"
-        )
-    else:
-        # Filtragem de nós com base nos intervalos selecionados
-        SG_nodes = [
-            n for n in G.nodes()
-            if in_degree_range[0] <= G.in_degree(n) <= in_degree_range[1]
-            or out_degree_range[0] <= G.out_degree(n) <= out_degree_range[1]
-        ]
+            out_degree_range = st.slider(
+                "Intervalo de Grau de Saída (out-degree)",
+                min_value=min_out_degree,
+                max_value=max_out_degree,
+                value=(2, max_out_degree // 4),
+            )
 
-        # Subgrafo induzido pelos nós filtrados
-        SG = G.subgraph(SG_nodes).copy()
+        with col2:
+            show_largest_scc = st.checkbox("Mostrar maior SCC (dirigido)", value=False)
+        with col3:
+            show_largest_wcc = st.checkbox("Mostrar maior WCC", value=False)
 
-        # Exibir estatísticas do subgrafo
-        st.info(
-            f"Subgrafo (grau de entrada ∈ [{in_degree_range[0]}, {in_degree_range[1]}], "
-            f"grau de saída ∈ [{out_degree_range[0]}, {out_degree_range[1]}]): "
-            f"{G.number_of_nodes()} nós, {G.number_of_edges()} arestas"
-        )
+        # =============================================
+        # APLICAÇÃO DOS FILTROS
+        # =============================================
+        if show_largest_scc and nx.is_directed(G):
+            largest_scc = max(nx.strongly_connected_components(G), key=len)
+            SG = G.subgraph(largest_scc).copy()
+            st.info(
+                f"Subgrafo: Maior SCC → {G.number_of_nodes()} nós, {G.number_of_edges()} arestas"
+            )
+        elif show_largest_wcc:
+            largest_wcc = max(nx.weakly_connected_components(G), key=len)
+            SG = G.subgraph(largest_wcc).copy()
+            st.info(
+                f"Subgrafo: Maior WCC → {G.number_of_nodes()} nós, {G.number_of_edges()} arestas"
+            )
+        else:
+            # Filtragem de nós com base nos intervalos selecionados
+            SG_nodes = [
+                n
+                for n in G.nodes()
+                if in_degree_range[0] <= G.in_degree(n) <= in_degree_range[1]
+                or out_degree_range[0] <= G.out_degree(n) <= out_degree_range[1]
+            ]
 
-    # =============================================
-    # VISUALIZAÇÃO PRINCIPAL DO GRAFO
-    # =============================================
-    with st.expander("🌐 Visualização Interativa do Grafo", expanded=True):
+            # Subgrafo induzido pelos nós filtrados
+            SG = G.subgraph(SG_nodes).copy()
+
+            # Exibir estatísticas do subgrafo
+            st.info(
+                f"Subgrafo (grau de entrada ∈ [{in_degree_range[0]}, {in_degree_range[1]}], "
+                f"grau de saída ∈ [{out_degree_range[0]}, {out_degree_range[1]}]): "
+                f"{G.number_of_nodes()} nós, {G.number_of_edges()} arestas"
+            )
+
+        # =============================================
+        # VISUALIZAÇÃO PRINCIPAL DO GRAFO
+        # =============================================
         net = Network(
             notebook=False,
             height="750px",
@@ -285,7 +441,9 @@ if uploaded_file:
 
             saturation = 70
             denominator = max(max_in, max_out)
-            lightness = 60 - min(20, total / denominator * 20) if denominator > 0 else 60
+            lightness = (
+                60 - min(20, total / denominator * 20) if denominator > 0 else 60
+            )
             degree_info = f"Grau entrada: {k_in}, saída: {k_out}"
 
             net.add_node(
@@ -321,7 +479,7 @@ if uploaded_file:
 
         with col1:
             st.metric("Densidade", f"{nx.density(SG):.4f}", help=help_densidade)
-            
+
             assort = calcular_assortatividade_segura(SG)
             st.metric(
                 "Assortatividade(grau do nó)",
@@ -409,7 +567,7 @@ if uploaded_file:
                 ["Degree", "Closeness", "Betweenness", "Eigenvector"],
             )
         with col2:
-            k = st.slider("Número de nós para mostrar", 1, 50, 10)
+            k = st.slider("Número de nós para mostrar", 1, 100, 10)
 
         # Cálculo da centralidade
         if metric == "Degree":
@@ -492,14 +650,13 @@ if uploaded_file:
                     degree_info = f"Grau entrada/saída: {k_in}"
 
                 saturation = 70
-                
+
                 max_connections = max(max_in, max_out)
                 if max_connections == 0:
                     lightness = 60  # Valor padrão quando não há conexões
                 else:
                     lightness = 60 - min(20, total / max_connections * 20)
-                
-                
+
                 degree_info = f"Grau entrada: {k_in}, saída: {k_out}"
 
                 net2.add_node(
