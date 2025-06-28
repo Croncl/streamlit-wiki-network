@@ -1,8 +1,6 @@
+# 🔍 Análise e Visualização de Redes
 
-````markdown
-# 🔍 Análise e Visualização de Redes Complexas
-
-Este projeto é uma aplicação web interativa desenvolvida com **Streamlit** para análise e visualização de redes complexas direcionadas a partir de dados tabulares.
+Este projeto é uma aplicação web interativa desenvolvida com **Streamlit** para análise e visualização de redes direcionadas a partir de dados tabulares.
 
 ---
 
@@ -14,6 +12,10 @@ Este projeto é uma aplicação web interativa desenvolvida com **Streamlit** pa
   - Assortatividade de grau
   - Coeficiente de clustering
   - Número de componentes fortemente e fracamente conectados
+- Visualização gráfica estática com Matplotlib:
+  - Destaque visual por métricas de centralidade (tamanho e cor dos nós)
+  - Layout aleatório fixo para reprodutibilidade
+  - Rótulos para os 5 nós mais centrais por métrica
 - Visualização gráfica interativa da rede com **PyVis**, incluindo:
   - Cores e tamanhos dos nós baseados em graus de entrada e saída
   - Visualização das arestas com pesos (se presentes)
@@ -37,7 +39,7 @@ Este projeto é uma aplicação web interativa desenvolvida com **Streamlit** pa
 - [Pandas](https://pandas.pydata.org/)
 - [Matplotlib](https://matplotlib.org/)
 - [Seaborn](https://seaborn.pydata.org/)
-- [Numpy]
+- [Numpy](https://numpy.org/)
 
 ---
 
@@ -47,8 +49,8 @@ Este projeto é uma aplicação web interativa desenvolvida com **Streamlit** pa
 
    ```bash
    git clone https://github.com/Croncl/streamlit-wiki-network.git
-   cd seu_repositorio
-````
+   cd streamlit-wiki-network
+   ```
 
 2. (Opcional) Crie e ative um ambiente virtual:
 
@@ -70,7 +72,7 @@ Este projeto é uma aplicação web interativa desenvolvida com **Streamlit** pa
    streamlit run app.py
    ```
 
-5. Acesse no navegador [http://localhost:8501](http://localhost:8501)
+5. Acesse no navegador: [http://localhost:8501](http://localhost:8501)
 
 6. Faça upload de um arquivo CSV com colunas `source` e `target` para começar a análise.
 
@@ -79,7 +81,7 @@ Este projeto é uma aplicação web interativa desenvolvida com **Streamlit** pa
 ## 🗂 Formato esperado do arquivo CSV
 
 | source | target |
-| ------ | ------ |
+|--------|--------|
 | A      | B      |
 | B      | C      |
 | C      | A      |
@@ -91,18 +93,10 @@ Este projeto é uma aplicação web interativa desenvolvida com **Streamlit** pa
 
 ## 📈 Métricas calculadas
 
-* **Densidade:** Quão conectada está a rede (0 a 1).
-* **Assortatividade:** Tendência de nós com grau similar se conectarem.
-* **Coeficiente de Clustering:** Grau de formação de triângulos no grafo.
-* **Componentes Fortemente Conectados (SCC):** Subgrafos com nós mutuamente alcançáveis via caminhos dirigidos.
-* **Componentes Fracamente Conectados (WCC):** Subgrafos considerando o grafo como não direcionado.
-
----
-
-## 🔍 Visualização e filtros
-
-* Layout ForceAtlas2 para organização visual.
-* Cores dos nós indicam perfil de grau (entrada/saída).
-* Filtros por grau mínimo, maior SCC e maior WCC.
+- **Densidade:** Quão conectada está a rede (0 a 1).
+- **Assortatividade:** Tendência de nós com grau similar se conectarem.
+- **Coeficiente de Clustering:** Grau de formação de triângulos no grafo.
+- **Componentes Fortemente Conectados (SCC):** Subgrafos com nós mutuamente alcançáveis via caminhos dirigidos.
+- **Componentes Fracamente Conectados (WCC):** Subgrafos considerando o grafo como não direcionado.
 
 ---
